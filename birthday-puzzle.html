@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bracket City</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #f0f0f0; font-family: 'Courier New', Courier, monospace; min-height: 100vh; }
+.outer { max-width: 700px; margin: 0 auto; padding: 2rem 1rem 1.5rem; }
+.header { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.3rem; }
+.title { font-size: 2rem; font-weight: 900; font-family: Georgia, serif; letter-spacing: 1px; color: #111; }
+.date-row { text-align: center; font-size: 0.85rem; font-weight: 700; letter-spacing: 2px; font-family: Georgia, serif; color: #222; margin-bottom: 1.5rem; text-transform: uppercase; }
+.para-card { background: #e8e8e8; border-radius: 14px; padding: 1.4rem 1.5rem; font-size: 1.05rem; line-height: 2.4; color: #111; margin-bottom: 1rem; word-break: break-word; }
+.clue-available { background: #6c6fc7; color: #fff; font-weight: 700; cursor: pointer; border-radius: 3px; padding: 1px 3px; }
+.clue-available:hover { background: #5558b0; }
+.clue-solved-recent { background: #a8e6a8; color: #111; border-radius: 3px; padding: 1px 3px; }
+.input-row { display: flex; border-radius: 10px; overflow: hidden; background: #fff; border: 1.5px solid #ccc; }
+.ans-input { flex: 1; padding: 0.8rem 1rem; font-size: 1rem; font-family: 'Courier New', Courier, monospace; border: none; background: transparent; color: #555; outline: none; }
+.ans-input::placeholder { color: #bbb; }
+.enter-btn { background: #6c6fc7; color: #fff; border: none; padding: 0 1.3rem; font-size: 1rem; font-family: 'Courier New', Courier, monospace; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
+.enter-btn:hover { background: #5558b0; }
+.shake { animation: sh 0.35s; }
+@keyframes sh { 0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)} }
+.final-reveal { display: none; background: #fff; border-radius: 12px; padding: 1.8rem 1.5rem; text-align: center; font-family: Georgia, serif; }
+.final-reveal.show { display: block; }
+.progress { font-size: 0.78rem; color: #888; text-align: right; margin-bottom: 0.4rem; }
+.modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
+.modal-backdrop.open { display: flex; }
+.modal { background: #fff; border-radius: 16px; padding: 1.5rem 1.5rem 1.2rem; width: 340px; max-width: 90vw; font-family: Arial, sans-serif; position: relative; }
+.modal-title { font-size: 1.2rem; font-weight: 700; color: #111; margin-bottom: 0.5rem; }
+.modal-divider { border: none; border-top: 1px solid #e0e0e0; margin: 0.5rem 0 1rem; }
+.modal-body { font-size: 0.95rem; color: #444; margin-bottom: 1.2rem; line-height: 1.5; }
+.modal-close { position: absolute; top: 1rem; right: 1.1rem; background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+.modal-close:hover { color: #333; }
+.modal-ok { display: block; width: 100%; padding: 0.7rem; background: #111; color: #fff; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-bottom: 0.6rem; font-family: Arial, sans-serif; }
+.modal-ok:hover { background: #333; }
+.modal-cancel { display: block; width: 100%; padding: 0.7rem; background: #fff; color: #111; border: 1.5px solid #ccc; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; font-family: Arial, sans-serif; }
+.modal-cancel:hover { background: #f5f5f5; }
+</style>
+</head>
+<body>
+
+<div class="outer">
+  <div class="header">
+    <span>🎂</span>
+    <div class="title">[Bracket City]</div>
+    <span>🎂</span>
+  </div>
+  <div class="date-row">June 24, 2026</div>
+
+  <div id="game-area">
+    <div class="para-card" id="para"></div>
+    <div class="progress" id="prog">0 / 12 solved</div>
+    <div class="input-row">
+      <input class="ans-input" id="inp" type="text" placeholder="type any answer..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button class="enter-btn" id="btn">[enter]</button>
+    </div>
+  </div>
+
+  <div class="final-reveal" id="final-reveal">
+    <div style="font-size:1.6rem;font-weight:900;font-family:Georgia,serif;margin-bottom:1rem;letter-spacing:1px;">PUZZLE SOLVED!</div>
+    <div style="font-size:1.1rem;color:#111;font-family:Georgia,serif;line-height:1.7;">
+      <strong>June 24, 2002:</strong> My sweet, smart, and favourite cheetah ever was born.
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">&#x2715;</button>
+    <div class="modal-title" id="modal-title">Peek</div>
+    <hr class="modal-divider">
+    <div class="modal-body" id="modal-body"></div>
+    <button class="modal-ok" id="modal-ok">OK</button>
+    <button class="modal-cancel" id="modal-cancel">Cancel</button>
+  </div>
+</div>
+
+<script>
+var clueMap = {
+  mollytea: { answer: "Molly Tea", deps: [] },
+  savour:   { answer: "savour",   deps: ["mollytea"] },
+  sweet:    { answer: "sweet",    deps: ["savour"] },
+  cook:     { answer: "cook",     deps: [] },
+  smart:    { answer: "smart",    deps: ["cook"] },
+  favour:   { answer: "favour",   deps: [] },
+  et:       { answer: "et",       deps: [] },
+  men:      { answer: "men",      deps: [] },
+  ah:       { answer: "ah",       deps: ["men"] },
+  link:     { answer: "link",     deps: [] },
+  alter:    { answer: "alter",    deps: [] },
+  or:       { answer: "or",       deps: ["link", "alter"] }
+};
+
+var solved = {};
+var hintState = {};
+var solvedCount = 0;
+var recentId = null;
+var total = Object.keys(clueMap).length;
+
+function norm(s) { return s.trim().toLowerCase(); }
+function isAvailable(id) {
+  return !solved[id] && clueMap[id].deps.every(function(d) { return solved[d]; });
+}
+
+function solvedSpan(id) {
+  if (id === recentId) return '<span class="clue-solved-recent">' + clueMap[id].answer + '</span>';
+  return clueMap[id].answer;
+}
+
+function innerHTML(id) {
+  switch(id) {
+    case "mollytea": return "known for its jasmine milk tea";
+    case "savour":   return "sip slowly with " + node("mollytea") + " straws";
+    case "sweet":    return "opposite of " + node("savour") + "y";
+    case "cook":     return "fun activity on a 2nd date";
+    case "smart":    return "street &#x27A1;&#xFE0F; ______ &#x2B05;&#xFE0F; " + node("cook") + "ie";
+    case "favour":   return "can you do me a ______?";
+    case "et":       return "eastern time shortened";
+    case "men":      return "x-____ or mad ____";
+    case "ah":       return "an ____-ha mo" + node("men") + "t";
+    case "link":     return "protagonist of Zelda";
+    case "alter":    return "change something";
+    case "or":       return "The " + node("link") + " that connects " + node("alter") + "natives";
+  }
+}
+
+function node(id) {
+  if (solved[id]) return solvedSpan(id);
+  var inner = innerHTML(id);
+  if (hintState[id] === 1) inner += " (" + clueMap[id].answer[0].toUpperCase() + ")";
+  if (isAvailable(id)) return '<span class="clue-available" onclick="handleClick(\'' + id + '\')">[' + inner + ']</span>';
+  return '[' + inner + ']';
+}
+
+function buildPara() {
+  document.getElementById("para").innerHTML = "My " + node("sweet") + ", " + node("smart") + ", and " + node("favour") + "ite che" + node("et") + node("ah") + " ever was b" + node("or") + "n.";
+}
+
+var pendingId = null;
+var pendingAction = null;
+
+function handleClick(id) {
+  if (solved[id] || !isAvailable(id)) return;
+  pendingId = id;
+  var state = hintState[id] || 0;
+  if (state === 0) {
+    pendingAction = "peek";
+    document.getElementById("modal-title").textContent = "Peek";
+    document.getElementById("modal-body").textContent = "You sure you want to peek at the first letter of this answer?";
+  } else {
+    pendingAction = "reveal";
+    document.getElementById("modal-title").textContent = "Reveal Word";
+    document.getElementById("modal-body").textContent = "You sure you want to reveal this answer?";
+  }
+  document.getElementById("modal-backdrop").classList.add("open");
+}
+
+function closeModal() {
+  document.getElementById("modal-backdrop").classList.remove("open");
+  pendingId = null;
+  pendingAction = null;
+}
+
+document.getElementById("modal-cancel").addEventListener("click", closeModal);
+document.getElementById("modal-close").addEventListener("click", closeModal);
+document.getElementById("modal-backdrop").addEventListener("click", function(e) {
+  if (e.target === document.getElementById("modal-backdrop")) closeModal();
+});
+
+document.getElementById("modal-ok").addEventListener("click", function() {
+  if (!pendingId) return;
+  if (pendingAction === "peek") {
+    hintState[pendingId] = 1;
+    closeModal();
+    buildPara();
+  } else {
+    markSolved(pendingId);
+    closeModal();
+  }
+});
+
+function markSolved(id) {
+  solved[id] = true;
+  recentId = id;
+  solvedCount++;
+  document.getElementById("prog").textContent = solvedCount + " / " + total + " solved";
+  buildPara();
+  if (solvedCount === total) {
+    document.getElementById("game-area").style.display = "none";
+    document.getElementById("final-reveal").classList.add("show");
+  }
+}
+
+function tryAnswer() {
+  var val = document.getElementById("inp").value;
+  var n = norm(val);
+  var ids = Object.keys(clueMap);
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    if (!solved[id] && norm(clueMap[id].answer) === n) {
+      document.getElementById("inp").value = "";
+      markSolved(id);
+      return;
+    }
+  }
+  var inp = document.getElementById("inp");
+  inp.classList.remove("shake");
+  void inp.offsetWidth;
+  inp.classList.add("shake");
+  setTimeout(function() { inp.classList.remove("shake"); }, 400);
+}
+
+document.getElementById("btn").addEventListener("click", tryAnswer);
+document.getElementById("inp").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") tryAnswer();
+});
+
+buildPara();
+</script>
+</body>
+</html>
